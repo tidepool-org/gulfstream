@@ -1,12 +1,21 @@
-//
-//  AppDelegate.swift
-//  brandon
-//
-//  Created by Ethan Look on 12/21/14.
-//  Copyright (c) 2014 Ethan Look. All rights reserved.
-//
+/*
+* Copyright (c) 2015, Tidepool Project
+*
+* This program is free software; you can redistribute it and/or modify it under
+* the terms of the associated License, which is identical to the BSD 2-Clause
+* License as published by the Open Source Initiative at opensource.org.
+*
+* This program is distributed in the hope that it will be useful, but WITHOUT
+* ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+* FOR A PARTICULAR PURPOSE. See the License for more details.
+*
+* You should have received a copy of the License along with this program; if
+* not, you can obtain one from Tidepool Project at tidepool.org.
+*/
 
 import UIKit
+import Foundation
+import SystemConfiguration
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -16,6 +25,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(application: UIApplication, didFinishLaunchingWithOptions launchOptions: [NSObject: AnyObject]?) -> Bool {
         // Override point for customization after application launch.
+                
         return true
     }
 
@@ -41,6 +51,40 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
 
-
+    func isConnectedToNetwork() -> Bool {
+        
+        var zeroAddress = sockaddr_in(sin_len: 0, sin_family: 0, sin_port: 0, sin_addr: in_addr(s_addr: 0), sin_zero: (0, 0, 0, 0, 0, 0, 0, 0))
+        zeroAddress.sin_len = UInt8(sizeofValue(zeroAddress))
+        zeroAddress.sin_family = sa_family_t(AF_INET)
+        
+        let defaultRouteReachability = withUnsafePointer(&zeroAddress) {
+            SCNetworkReachabilityCreateWithAddress(nil, UnsafePointer($0)).takeRetainedValue()
+        }
+        
+        var flags: SCNetworkReachabilityFlags = 0
+        if SCNetworkReachabilityGetFlags(defaultRouteReachability, &flags) == 0 {
+            return false
+        }
+        
+        let isReachable = (flags & UInt32(kSCNetworkFlagsReachable)) != 0
+        let needsConnection = (flags & UInt32(kSCNetworkFlagsConnectionRequired)) != 0
+        
+        return isReachable && !needsConnection
+    }
+    
+    func checkInternetWithAlert() {
+        if (!isConnectedToNetwork()) {
+            let noNetworkAlert = UIAlertController(title: "Invalid CGM Name", message: "Please try again with a valid NightScout CGM name.", preferredStyle: .Alert)
+            
+            let callActionHandler = { (action:UIAlertAction!) -> Void in
+                UIApplication.sharedApplication().openURL(NSURL(fileURLWithPath: UIApplicationOpenSettingsURLString)!)
+            }
+            
+            noNetworkAlert.addAction(UIAlertAction(title: "OK", style: UIAlertActionStyle.Cancel, handler: callActionHandler))
+            
+            let vc = self.window?.rootViewController
+            vc!.presentViewController(noNetworkAlert, animated: true, completion: nil)
+        }
+    }
 }
 
